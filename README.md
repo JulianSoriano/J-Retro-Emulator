@@ -33,7 +33,7 @@ Your library, settings and saves are stored in `~/.config/js-emulators`.
 
 ## Download and run
 
-1. Download `JsEmulators-x86_64.AppImage` from the [Releases page](../../releases/latest).
+1. Download [`JsEmulators-x86_64.AppImage`](https://github.com/JulianSoriano/J-Retro-Emulator/raw/main/dist/JsEmulators-x86_64.AppImage) (87 MB). It lives in the [`dist/`](dist/) folder of this repo.
 2. Make it executable, then run it:
 
    ```bash
@@ -53,7 +53,7 @@ Requires a 64-bit (x86_64) Linux system. On some distributions you also need FUS
 347c42bdb824c5ceca8d84042bb8ea864868804b860f04141984b874fbceee2c  JsEmulators-x86_64.AppImage
 ```
 
-Check it with `sha256sum JsEmulators-x86_64.AppImage`.
+Check it with `sha256sum JsEmulators-x86_64.AppImage`, or compare with [`dist/SHA256SUMS`](dist/SHA256SUMS).
 
 ## Controls (defaults)
 
