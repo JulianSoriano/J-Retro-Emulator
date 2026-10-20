@@ -31,6 +31,19 @@ Emulation cores (compiled to WebAssembly): FCEUmm (NES), Snes9x (SNES), mGBA (Ga
 
 Your library, settings and saves are stored in `~/.config/js-emulators`.
 
+## Single HTML file (no install)
+
+`dist/J-Retro-Emulator.html` is the whole emulator in one web page (13 MB): all four emulation cores are built into it, so it works offline.
+
+1. Download [`J-Retro-Emulator.html`](https://github.com/JulianSoriano/J-Retro-Emulator/raw/main/dist/J-Retro-Emulator.html) (right-click the link and choose "Save link as", because opening it directly just shows the code).
+2. Double-click the saved file. It opens in your browser. Drag a ROM onto the page to play.
+
+Notes:
+- It has the same features as the AppImage, including save states (F2 saves, F4 loads) and the state editor.
+- Your library, settings and save states are kept in that browser, on that computer. Clearing the browser's site data deletes them, so use the state editor's "Download state" to back up important saves. Different browsers keep separate libraries.
+- This build has no backup engine for browsers that block WebAssembly (nearly all modern browsers allow it).
+- The page asks Google Fonts for its fonts when you're online. Offline, it just uses a standard font.
+
 ## Download and run
 
 1. Download [`JsEmulators-x86_64.AppImage`](https://github.com/JulianSoriano/J-Retro-Emulator/raw/main/dist/JsEmulators-x86_64.AppImage) (87 MB). It lives in the [`dist/`](dist/) folder of this repo.
