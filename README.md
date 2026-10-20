@@ -4,6 +4,17 @@ An all-in-one retro emulator for Nintendo and Sega consoles and handhelds that r
 
 **Play it online:** https://juliansoriano.github.io/J-Retro-Emulator/
 
+## Documentation
+
+- **[User guide](docs/USER_GUIDE.md):** how to load games, controls, save states, backups and the state editor, with troubleshooting
+- **[How it works](docs/HOW_IT_WORKS.md):** what is inside, how a game runs, how saving works and how the one-file build is made
+
+## Quick start
+
+1. Open the link above (or download `index.html` and double-click it to use it offline).
+2. Press **Open ROM** or drag a game file onto the screen.
+3. Play. **F2** saves a state, **F4** loads it. Hold **Tab** to fast forward.
+
 ## Supported systems
 
 | Brand | Systems | ROM file types |
@@ -33,7 +44,7 @@ Emulation cores (compiled to WebAssembly): FCEUmm (NES), Snes9x (SNES), mGBA (Ga
 
 Your library, settings and save states are kept in your browser, on your computer. Nothing is uploaded anywhere.
 
-## How to use it
+## Ways to run it
 
 **On GitHub Pages (easiest):** open the link above, then drag a ROM onto the page or press **Open ROM**.
 
@@ -78,6 +89,18 @@ No games are included. Use ROMs from cartridges you own. Dumping your own cartri
 - Checked with the built-in demo cartridge and with NES, Game Boy and Game Boy Advance ROMs loaded through the app. Commercial SNES, Master System, Game Gear and Genesis games have **not** been tested yet.
 - Needs a modern browser with WebAssembly (all current versions of Chrome, Edge, Firefox and Safari).
 - The page asks Google Fonts for its fonts when you're online. Offline, it uses a standard font.
+
+## Project layout
+
+| Path | What it is |
+|---|---|
+| `index.html` | The finished one-file emulator (generated, this is what Pages serves) |
+| `src/index.html` | The readable app source |
+| `src/cores/` | The four emulation cores (WebAssembly) |
+| `tools/build_single_file.py` | Builds `index.html` from `src/` |
+| `docs/` | User guide and how-it-works |
+
+To rebuild after editing the source: `python3 tools/build_single_file.py`
 
 ## Built with
 
