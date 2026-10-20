@@ -1,6 +1,8 @@
 # J-Retro-Emulator
 
-An all-in-one retro emulator for Nintendo and Sega consoles and handhelds, packaged as a single Linux AppImage. It runs completely offline. There is nothing to install and no account to make.
+An all-in-one retro emulator for Nintendo and Sega consoles and handhelds that runs in your web browser. It is a single web page with everything built in, so there is nothing to install and no account to make.
+
+**Play it online:** https://juliansoriano.github.io/J-Retro-Emulator/
 
 ## Supported systems
 
@@ -29,44 +31,20 @@ Emulation cores (compiled to WebAssembly): FCEUmm (NES), Snes9x (SNES), mGBA (Ga
 - Fast forward (hold **Tab**), pause (**Esc**), fullscreen (**F11**) and a volume control
 - Drag and drop a ROM onto the screen to play
 
-Your library, settings and saves are stored in `~/.config/js-emulators`.
+Your library, settings and save states are kept in your browser, on your computer. Nothing is uploaded anywhere.
 
-## Single HTML file (no install)
+## How to use it
 
-`dist/J-Retro-Emulator.html` is the whole emulator in one web page (13 MB): all four emulation cores are built into it, so it works offline.
+**On GitHub Pages (easiest):** open the link above, then drag a ROM onto the page or press **Open ROM**.
 
-1. Download [`J-Retro-Emulator.html`](https://github.com/JulianSoriano/J-Retro-Emulator/raw/main/dist/J-Retro-Emulator.html) (right-click the link and choose "Save link as", because opening it directly just shows the code).
-2. Double-click the saved file. It opens in your browser. Drag a ROM onto the page to play.
+**Offline:** download [`index.html`](https://github.com/JulianSoriano/J-Retro-Emulator/raw/main/index.html) (13 MB; right-click the link and choose "Save link as"), then double-click the saved file. All four emulation cores are built into the file, so it works without internet.
 
-Notes:
-- It has the same features as the AppImage, including save states (F2 saves, F4 loads) and the state editor.
-- Your library, settings and save states are kept in that browser, on that computer. Clearing the browser's site data deletes them, so use the state editor's "Download state" to back up important saves. Different browsers keep separate libraries.
-- This build has no backup engine for browsers that block WebAssembly (nearly all modern browsers allow it).
-- The page asks Google Fonts for its fonts when you're online. Offline, it just uses a standard font.
+**Hosting your own copy with GitHub Pages:** in your repository go to **Settings, then Pages**, choose **Deploy from a branch**, pick the `main` branch and the `/ (root)` folder, and save. The page appears at `https://<your-username>.github.io/<repository-name>/` after a minute or two.
 
-## Download and run
+## Saves and backups
 
-1. Download [`JsEmulators-x86_64.AppImage`](https://github.com/JulianSoriano/J-Retro-Emulator/raw/main/dist/JsEmulators-x86_64.AppImage) (87 MB). It lives in the [`dist/`](dist/) folder of this repo.
-2. Make it executable, then run it:
-
-   ```bash
-   chmod +x JsEmulators-x86_64.AppImage
-   ./JsEmulators-x86_64.AppImage
-   ```
-
-   Or right-click the file, open **Properties → Permissions** and turn on **Allow executing file as program**, then double-click it.
-
-> **Why the `chmod`?** Browsers can't mark downloads as executable. Until you do, a Linux file manager may offer to open the AppImage with a disk-image tool (for example GNOME Disks asking to "Restore Disk Image"). Cancel that and use one of the options above instead. Never restore it to a drive.
-
-Requires a 64-bit (x86_64) Linux system. On some distributions you also need FUSE 2 (`sudo dnf install fuse` on Fedora, `sudo apt install libfuse2` on Debian or Ubuntu). If you'd rather not install it, run the AppImage with `--appimage-extract-and-run`.
-
-### Verify the download (optional)
-
-```
-347c42bdb824c5ceca8d84042bb8ea864868804b860f04141984b874fbceee2c  JsEmulators-x86_64.AppImage
-```
-
-Check it with `sha256sum JsEmulators-x86_64.AppImage`, or compare with [`dist/SHA256SUMS`](dist/SHA256SUMS).
+- Save states, battery saves, your game library and settings live in the browser you used, on that site (the online page and a saved offline copy each keep their own). Different browsers keep separate libraries.
+- Clearing the browser's site data deletes them. Use the state editor's **Download state** to back up important saves, and **Import state** to bring them back.
 
 ## Controls (defaults)
 
@@ -90,7 +68,6 @@ All keys can be changed in the app's controls panel.
 | **Tab** (hold) | Fast forward |
 | **Esc** | Pause |
 | **F11** | Fullscreen |
-| **Ctrl+R** | Reload the app |
 
 ## Your games
 
@@ -101,6 +78,16 @@ No games are included. Use ROMs from cartridges you own. Dumping your own cartri
 - Checked with the built-in demo cartridge and with Game Boy and Game Boy Advance ROMs loaded through the app. Commercial SNES, Master System, Game Gear, Game Boy and Game Boy Advance games have **not** been tested yet.
 - x86_64 Linux only. It has been run on a virtual display, so please report anything odd on a real desktop (Fedora is the main target).
 
+## Your games
+
+No games are included. Use ROMs from cartridges you own. Dumping your own cartridges is the usual way to get them.
+
+## Known limits
+
+- Checked with the built-in demo cartridge and with NES, Game Boy and Game Boy Advance ROMs loaded through the app. Commercial SNES, Master System, Game Gear and Genesis games have **not** been tested yet.
+- Needs a modern browser with WebAssembly (all current versions of Chrome, Edge, Firefox and Safari).
+- The page asks Google Fonts for its fonts when you're online. Offline, it uses a standard font.
+
 ## Built with
 
-[Electron](https://www.electronjs.org/) for the desktop window and WebAssembly builds of libretro emulation cores. See each core's own project for its license.
+WebAssembly builds of libretro emulation cores (FCEUmm, Snes9x, mGBA and Genesis Plus GX). See each core's own project for its license.
