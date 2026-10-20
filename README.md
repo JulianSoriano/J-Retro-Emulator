@@ -75,15 +75,6 @@ No games are included. Use ROMs from cartridges you own. Dumping your own cartri
 
 ## Known limits
 
-- Checked with the built-in demo cartridge and with Game Boy and Game Boy Advance ROMs loaded through the app. Commercial SNES, Master System, Game Gear, Game Boy and Game Boy Advance games have **not** been tested yet.
-- x86_64 Linux only. It has been run on a virtual display, so please report anything odd on a real desktop (Fedora is the main target).
-
-## Your games
-
-No games are included. Use ROMs from cartridges you own. Dumping your own cartridges is the usual way to get them.
-
-## Known limits
-
 - Checked with the built-in demo cartridge and with NES, Game Boy and Game Boy Advance ROMs loaded through the app. Commercial SNES, Master System, Game Gear and Genesis games have **not** been tested yet.
 - Needs a modern browser with WebAssembly (all current versions of Chrome, Edge, Firefox and Safari).
 - The page asks Google Fonts for its fonts when you're online. Offline, it uses a standard font.
