@@ -130,9 +130,28 @@ svg.i { width: 16px; height: 16px; flex: none; }
 .led.on::before { background: var(--live); box-shadow: 0 0 8px var(--live); }
 .led.paused::before { background: var(--accent); }
 
-.transport { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.transport .grow { flex: 1; }
-.transport .break { flex-basis: 100%; height: 0; margin: -4px 0; }
+.transport { display: grid; gap: 8px; margin-top: 12px; }
+.trow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.trow .vol { margin-left: auto; }
+.trow-view { justify-content: space-between; }
+.transport button { min-height: 38px; }
+@media (max-width: 600px) {
+  .trow:first-child button { flex: 1; justify-content: center; }
+  .trow .vol { margin-left: 0; flex: 1 1 100%; }
+  .trow .vol input { flex: 1; width: auto; }
+  .trow-view { flex-wrap: nowrap; gap: 6px; }
+  .viewtoggles { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+  .viewtoggles button { justify-content: center; padding-left: 4px; padding-right: 4px; }
+  #btnFull { flex: none; width: 44px; padding: 0; justify-content: center; }
+  #btnFull .lbl { display: none; }
+}
+#btnFull[hidden] { display: none; }
+.panel h2 .fold { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
+.panel h2 .fold::before { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translate(-2px,-2px); transition: transform .15s; }
+.panel.collapsed h2 .fold::before { transform: rotate(-45deg); }
+.panel.collapsed h2 { margin-bottom: 0; }
+.panel.collapsed .fold-body { display: none; }
+.panel h2 .fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 .viewtoggles { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .viewtoggles button { padding-left: 10px; padding-right: 10px; }
 .vol { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-dim); font-size: 12px; }
@@ -279,6 +298,7 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
       </div>
 
       <div class="transport">
+        <div class="trow">
         <button id="btnPause" title="Pause (Esc)">
           <svg class="i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
           <span>Pause</span>
@@ -291,24 +311,25 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
           <svg class="i" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6l9 6-9 6zM12 6l9 6-9 6z"/></svg>
           Fast
         </button>
-        <span class="grow"></span>
         <label class="vol" for="volume">
           <button id="btnMute" title="Sound on/off" aria-label="Sound">
             <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="waves" d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>
           </button>
           <input id="volume" type="range" min="0" max="100" value="70" aria-label="Volume">
         </label>
-        <span class="break"></span>
+        </div>
+        <div class="trow trow-view">
+
         <span class="viewtoggles" role="group" aria-label="Picture filters">
           <button id="btnScan" aria-pressed="false" title="Scanlines: the thin dark lines of an old TV">Scanlines</button>
           <button id="btnSmooth" aria-pressed="false" title="Smooth pixels: softens the blocky pixels">Smooth</button>
           <button id="btnVoxel" aria-pressed="false" hidden title="Voxel style: turns every pixel into a lit 3D block, taller where the picture is brighter. Move the mouse over the screen to look around.">Voxel</button>
         </span>
-        <span class="grow"></span>
-        <button id="btnFull" title="Full screen">
+        <button id="btnFull" title="Full screen" aria-label="Full screen">
           <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-          Full screen
+          <span class="lbl">Full screen</span>
         </button>
+        </div>
       </div>
 
       <div class="touch" id="touch" aria-label="Touch controls"></div>
@@ -327,14 +348,16 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
         <p class="hint">Games you open are stored in this browser only, so you can start them again with one click. Drag a ROM onto the screen to open it.</p>
       </section>
 
-      <section class="panel" aria-labelledby="h-keys">
-        <h2 id="h-keys"><span id="keysTitle">Controls</span> <button id="btnKeysReset" style="padding:5px 8px;font-size:11px">Defaults</button></h2>
+      <section class="panel" id="keysPanel" aria-labelledby="h-keys">
+        <h2 id="h-keys"><button class="fold" id="btnKeysFold" aria-expanded="true" aria-controls="keysBody"><span id="keysTitle">Controls</span></button> <button id="btnKeysReset" style="padding:5px 8px;font-size:11px">Defaults</button></h2>
+        <div class="fold-body" id="keysBody">
         <table class="keys">
           <thead><tr><th>Button</th><th>Player 1</th><th>Player 2</th></tr></thead>
           <tbody id="keyRows"></tbody>
         </table>
         <div class="pads" id="pads"><span class="chip">No gamepad yet. Press a button on one to connect it.</span></div>
         <p class="hint">Click a key to change it. Sega and Nintendo consoles keep separate layouts. Hold Tab to fast forward, Esc to pause.</p>
+        </div>
       </section>
 
       <section class="panel" id="optsPanel" aria-labelledby="h-opts" hidden>
@@ -1280,6 +1303,16 @@ $('btnPause').onclick = () => { A.start(); setPaused(!S.paused); };
 $('btnReset').onclick = () => { if (S.core && !S.busy) { S.core.reset(); toast('Console reset'); } };
 $('btnFF').onclick = () => { S.ff = !S.ff; $('btnFF').setAttribute('aria-pressed', S.ff); };
 $('btnFull').onclick = () => { const req = scr.requestFullscreen || scr.webkitRequestFullscreen; if (req) { const r = req.call(scr); if (r && r.catch) r.catch(() => toast('Full screen is not available here.')); } else toast('Full screen is not available here.'); };
+
+// Controls panel can be folded away; remembers the choice (folded by default on small screens).
+(() => {
+  const panel = $('keysPanel'), btn = $('btnKeysFold');
+  let v = store('gp.keysOpen'); if (v === undefined || v === null) v = !window.matchMedia('(max-width: 820px)').matches;
+  const apply = (open) => { panel.classList.toggle('collapsed', !open); btn.setAttribute('aria-expanded', String(open)); };
+  apply(!!v);
+  btn.onclick = () => { const open = panel.classList.contains('collapsed'); apply(open); store('gp.keysOpen', open); };
+  if (!(scr.requestFullscreen || scr.webkitRequestFullscreen)) $('btnFull').hidden = true;   // e.g. iPhone Safari has no full screen for a page element
+})();
 $('volume').value = A.vol;
 $('volume').oninput = (e) => { A.vol = +e.target.value; store('gp.vol', A.vol); if (A.muted && A.vol > 0) { A.muted = false; store('gp.muted', false); } A.start(); A.applyVol(); muteIcon(); };
 function muteIcon() { $('waves').style.display = A.muted || A.vol === 0 ? 'none' : ''; $('btnMute').setAttribute('aria-pressed', A.muted ? 'true' : 'false'); }
