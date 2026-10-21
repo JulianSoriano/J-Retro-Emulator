@@ -64,12 +64,15 @@ Every game you open is remembered in the **Library** panel. Click one to play it
 | **F4** | Load state from the chosen slot |
 | **F11** | Full screen |
 
-**Display & input options**
+**Picture filters (under the screen, next to Full screen)**
+
+Three buttons sit right under the game, so you never have to scroll for them. A lit (gold) button is on.
 
 - **Scanlines** (on by default): the thin dark lines of an old TV. Turn off for a clean picture.
-- **Smooth pixels:** softens the blocky pixels.
-- **Voxel style (NES games only):** turns every pixel into a small lit 3D block, taller where the picture is brighter, so the game looks like a little diorama. Move the mouse over the screen to look around; move it away and the view settles back. Scanlines are hidden while it's on. It needs a computer with WebGL2 (any recent browser and graphics chip) and is more work for the graphics chip than the normal view; if the game stutters, turn it off. Save-state pictures stay flat.
-- **Six-button pads on Genesis:** turn this off if an older Genesis game ignores your buttons.
+- **Smooth:** softens the blocky pixels.
+- **Voxel** (NES games only): turns every pixel into a small lit 3D block, taller where the picture is brighter. It looks straight at the screen, with the blocks' sides showing toward the edges. Move the mouse over the screen to tilt the view and look around; move away and it settles back to straight on. Scanlines are hidden while it's on. It needs WebGL2 (any recent browser and graphics chip) and is more work for the graphics chip than the normal view; if the game stutters, turn it off. Save-state pictures stay flat.
+
+**Genesis input:** for Genesis games a small panel on the right has "Six-button pads". Turn it off if an older Genesis game ignores your buttons.
 
 Your choices are remembered by the browser.
 
@@ -110,7 +113,7 @@ Changed bytes show in gold until applied, and **Undo changes** reverts them. Edi
 | Nothing happens when I open a ROM | Check the file ending is in the table above. Some `.bin` files are not Genesis games. |
 | No sound | Click the page once (browsers block sound until you interact), and check the speaker button and volume slider. |
 | A Genesis game ignores buttons | Turn off "six-button pads". |
-| Game runs slowly | Close other heavy tabs. Fast forward (Tab) should be off. If Voxel style is on, turn it off. |
-| "Voxel style" is missing | It only appears for NES games. |
+| Game runs slowly | Close other heavy tabs. Fast forward (Tab) should be off. If Voxel is on, turn it off. |
+| The Voxel button is missing | It only appears for NES games. |
 | My saves are gone | Browser site data was probably cleared, or you're in a different browser or a private window. Restore from a downloaded state. |
 | "State from a different version" | That save was made with a different engine version and can't be loaded. |

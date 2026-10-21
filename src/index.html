@@ -132,6 +132,9 @@ svg.i { width: 16px; height: 16px; flex: none; }
 
 .transport { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .transport .grow { flex: 1; }
+.transport .break { flex-basis: 100%; height: 0; margin: -4px 0; }
+.viewtoggles { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.viewtoggles button { padding-left: 10px; padding-right: 10px; }
 .vol { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-dim); font-size: 12px; }
 .vol input { width: 96px; accent-color: var(--accent); }
 
@@ -295,6 +298,13 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
           </button>
           <input id="volume" type="range" min="0" max="100" value="70" aria-label="Volume">
         </label>
+        <span class="break"></span>
+        <span class="viewtoggles" role="group" aria-label="Picture filters">
+          <button id="btnScan" aria-pressed="false" title="Scanlines: the thin dark lines of an old TV">Scanlines</button>
+          <button id="btnSmooth" aria-pressed="false" title="Smooth pixels: softens the blocky pixels">Smooth</button>
+          <button id="btnVoxel" aria-pressed="false" hidden title="Voxel style: turns every pixel into a lit 3D block, taller where the picture is brighter. Move the mouse over the screen to look around.">Voxel</button>
+        </span>
+        <span class="grow"></span>
         <button id="btnFull" title="Full screen">
           <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
           Full screen
@@ -327,17 +337,14 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
         <p class="hint">Click a key to change it. Sega and Nintendo consoles keep separate layouts. Hold Tab to fast forward, Esc to pause.</p>
       </section>
 
-      <section class="panel" aria-labelledby="h-opts">
-        <h2 id="h-opts">Display &amp; input</h2>
+      <section class="panel" id="optsPanel" aria-labelledby="h-opts" hidden>
+        <h2 id="h-opts">Genesis input</h2>
         <div class="opts">
-          <label class="opt" for="optScan">Scanlines <input id="optScan" type="checkbox"></label>
-          <label class="opt" for="optSmooth">Smooth pixels <input id="optSmooth" type="checkbox"></label>
-          <label class="opt" for="optVoxel" id="optVoxelRow">Voxel style (NES games) <input id="optVoxel" type="checkbox"></label>
           <label class="opt" for="opt6" id="opt6Row">Six-button pads on Genesis (X Y Z Mode) <input id="opt6" type="checkbox" checked></label>
         </div>
-        <p class="hint" id="optVoxelHint">Turns every pixel into a lit 3D block, taller where the picture is brighter. Move the mouse over the screen to look around.</p>
         <p class="hint" id="opt6Hint">Turn six-button pads off if an older Genesis game ignores your input.</p>
       </section>
+      <div hidden><input id="optScan" type="checkbox"><input id="optSmooth" type="checkbox"><input id="optVoxel" type="checkbox"></div>
     </aside>
   </main>
   <footer class="credit" id="credit">Emulation cores: Genesis Plus GX (Genesis, Master System, Game Gear), FCEUmm (NES), Snes9x 2010 (SNES) and mGBA (Game Boy, Game Boy Color, Game Boy Advance), built for the browser. A core downloads the first time you open a game for its console. Your ROMs, saves and settings stay in this browser and are never uploaded.</footer>
@@ -756,7 +763,7 @@ function draw() {
 // (it feeds the save-state thumbnails), the voxel canvas is just shown on top.
 const VOX = {
   on: false, gl: null, prog: null, tex: null, vao: null, u: {}, w: 0, h: 0, dirty: false, raf: 0,
-  yaw: 0, pitch: 0.5, ty: 0, tp: 0.5,
+  yaw: 0, pitch: 0, ty: 0, tp: 0,
   init() {
     const c = $('cv3');
     const gl = c.getContext('webgl2', { antialias: true, alpha: false });
@@ -764,20 +771,22 @@ const VOX = {
     const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
     const vs = `#version 300 es
 precision highp float;
-uniform highp sampler2D uTex; uniform ivec2 uSize; uniform mat3 uRot; uniform vec2 uScale; uniform float uH;
+uniform highp sampler2D uTex; uniform ivec2 uSize; uniform mat3 uRot; uniform vec2 uScale; uniform float uH; uniform float uDist;
 in vec3 aPos; in vec3 aNrm;
 out vec3 vCol;
 void main() {
   int id = gl_InstanceID; int x = id % uSize.x; int y = id / uSize.x;
   vec3 c = texelFetch(uTex, ivec2(x, y), 0).rgb;
   float lum = dot(c, vec3(0.299, 0.587, 0.114));
-  float hgt = 0.6 + lum * uH;
+  float hgt = 0.8 + lum * uH;
   vec3 p = vec3(float(x) + 0.05 + aPos.x * 0.9, float(uSize.y - 1 - y) + 0.05 + aPos.y * 0.9, aPos.z * hgt);
   p.xy -= vec2(uSize) * 0.5;
   vec3 r = uRot * p;
-  gl_Position = vec4(r.x * uScale.x, r.y * uScale.y, -r.z / float(uSize.x), 1.0);
+  float wc = (uDist - r.z) / uDist;                       // gentle perspective: the camera sits in front of the picture
+  gl_Position = vec4(r.x * uScale.x, r.y * uScale.y, -r.z / float(uSize.x) * wc, wc);
   vec3 n = uRot * aNrm;
-  float l = 0.5 + 0.55 * max(dot(normalize(n), normalize(vec3(-0.35, 0.55, 0.75))), 0.0);
+  float l = 0.62 + 0.45 * max(dot(normalize(n), normalize(vec3(-0.3, 0.45, 0.85))), 0.0);
+  if (abs(aNrm.z) < 0.5) l *= mix(0.5, 1.0, aPos.z);   // block sides get darker toward the base, which gives each pixel visible depth
   vCol = c * l;
 }`;
     const fs = `#version 300 es
@@ -788,13 +797,13 @@ void main() { o = vec4(vCol, 1.0); }`;
     gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs));
     gl.bindAttribLocation(pr, 0, 'aPos'); gl.bindAttribLocation(pr, 1, 'aNrm');
     gl.linkProgram(pr); if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
-    // Cube faces, 2 triangles each. The camera always looks from the front and above, so the back face is never
-    // needed, and only one of the two side faces is visible at a time (chosen in render()).
+    // Cube faces, 2 triangles each. Only the faces turned toward the camera are drawn (top, then front or back, then left or right; chosen in render()).
     const faces = [
       [[0,0,1],[1,0,1],[1,1,1],[0,1,1],[0,0,1]],   // top        (vertices 0-5)
       [[0,0,0],[0,0,1],[1,0,1],[1,0,0],[0,-1,0]],   // front      (6-11)
-      [[0,0,0],[0,1,0],[0,1,1],[0,0,1],[-1,0,0]],   // left side  (12-17)
-      [[1,0,0],[1,0,1],[1,1,1],[1,1,0],[1,0,0]],   // right side (18-23)
+      [[0,1,0],[1,1,0],[1,1,1],[0,1,1],[0,1,0]],   // back       (12-17)
+      [[0,0,0],[0,1,0],[0,1,1],[0,0,1],[-1,0,0]],   // left side  (18-23)
+      [[1,0,0],[1,0,1],[1,1,1],[1,1,0],[1,0,0]],   // right side (24-29)
     ];
     const v = [];
     for (const f of faces) { const q = f.slice(0, 4), n = f[4]; for (const i of [0, 1, 2, 0, 2, 3]) v.push(...q[i], ...n); }
@@ -806,15 +815,15 @@ void main() { o = vec4(vCol, 1.0); }`;
     const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    for (const k of ['uTex', 'uSize', 'uRot', 'uScale', 'uH']) this.u[k] = gl.getUniformLocation(pr, k);
+    for (const k of ['uTex', 'uSize', 'uRot', 'uScale', 'uH', 'uDist']) this.u[k] = gl.getUniformLocation(pr, k);
     Object.assign(this, { gl, prog: pr, tex, vao });
     c.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.gl = null; setVoxel(false, true); toast('The 3D view stopped (graphics reset). Voxel style is off.'); });
     scr.addEventListener('pointermove', (e) => {
       if (!this.on) return; const r = scr.getBoundingClientRect();
       const nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
-      this.ty = nx * 0.8; this.tp = 0.5 + ny * 0.5; this.kick();
+      this.ty = nx * 0.4; this.tp = ny * 0.35; this.kick();
     });
-    scr.addEventListener('pointerleave', () => { this.ty = 0; this.tp = 0.5; this.kick(); });
+    scr.addEventListener('pointerleave', () => { this.ty = 0; this.tp = 0; this.kick(); });
     return true;
   },
   kick() { this.dirty = true; if (!this.raf && this.on) this.raf = requestAnimationFrame(() => this.tick()); },
@@ -848,10 +857,11 @@ void main() { o = vec4(vCol, 1.0); }`;
     for (let c2 = 0; c2 < 3; c2++) for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) m[c2 * 3 + r] += Rx[k * 3 + r] * Rz[c2 * 3 + k];
     gl.uniformMatrix3fv(this.u.uRot, false, m);
     gl.uniform1i(this.u.uTex, 0); gl.uniform2i(this.u.uSize, this.w, this.h);
-    gl.uniform2f(this.u.uScale, 2 / (this.w * 1.06), 2 / (this.h * 1.06 * Math.max(cp, 0.75))); gl.uniform1f(this.u.uH, 9);
+    gl.uniform2f(this.u.uScale, 2 / (this.w * 1.04), 2 / (this.h * 1.04 * Math.max(cp, 0.9))); gl.uniform1f(this.u.uH, 5); gl.uniform1f(this.u.uDist, this.w * 0.9);
     const n = this.w * this.h;
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 12, n);                            // top + front
-    gl.drawArraysInstanced(gl.TRIANGLES, m[2] > 0 ? 18 : 12, 6, n);           // the side that faces the camera
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);                             // top
+    gl.drawArraysInstanced(gl.TRIANGLES, m[5] > 0 ? 12 : 6, 6, n);            // front or back, whichever faces the camera
+    gl.drawArraysInstanced(gl.TRIANGLES, m[2] > 0 ? 24 : 18, 6, n);           // left or right
   },
 };
 function setVoxel(on, quiet) {
@@ -860,7 +870,7 @@ function setVoxel(on, quiet) {
     catch (e) { VOX.gl = null; $('optVoxel').checked = false; if (!quiet) toast('This browser or graphics card cannot show the voxel style.'); on = false; }
   }
   VOX.on = !!on && S.sys === 'nes';
-  $('cv3').hidden = !VOX.on; scr.classList.toggle('voxel', VOX.on);
+  $('cv3').hidden = !VOX.on; scr.classList.toggle('voxel', VOX.on); if (typeof syncToggles === 'function') syncToggles();
   if (VOX.on && S.core && S.running) { VOX.w = 0; draw(); }
 }
 function setAspect(ar) {
@@ -1123,8 +1133,8 @@ function renderTouch() {
 
 function renderOpts() {
   const sega = SYSTEMS[S.sys].core === 'gpgx';
-  $('opt6Row').hidden = !sega; $('opt6Hint').hidden = !sega;
-  const nes = S.sys === 'nes'; $('optVoxelRow').hidden = !nes; $('optVoxelHint').hidden = !nes;
+  $('optsPanel').hidden = !sega;
+  const nes = S.sys === 'nes'; $('btnVoxel').hidden = !nes;
   if (typeof optVoxel !== 'undefined') setVoxel(optVoxel.checked, true);
 }
 
@@ -1183,10 +1193,12 @@ $('btnKeysReset').onclick = () => { const fam = pad().family; keymaps[fam] = clo
 const optScan = $('optScan'), optSmooth = $('optSmooth'), opt6 = $('opt6');
 optScan.checked = store('gp.scan') !== false; optSmooth.checked = !!store('gp.smooth'); opt6.checked = S.six;
 const optVoxel = $('optVoxel'); optVoxel.checked = !!store('gp.voxel');
-const applyView = () => { scr.classList.toggle('scanlines', optScan.checked); scr.classList.toggle('smooth', optSmooth.checked); };
+const syncToggles = () => { $('btnScan').setAttribute('aria-pressed', optScan.checked); $('btnSmooth').setAttribute('aria-pressed', optSmooth.checked); $('btnVoxel').setAttribute('aria-pressed', optVoxel.checked); };
+const applyView = () => { scr.classList.toggle('scanlines', optScan.checked); scr.classList.toggle('smooth', optSmooth.checked); syncToggles(); };
 optScan.onchange = () => { store('gp.scan', optScan.checked); applyView(); };
 optSmooth.onchange = () => { store('gp.smooth', optSmooth.checked); applyView(); };
-optVoxel.onchange = () => { store('gp.voxel', optVoxel.checked); setVoxel(optVoxel.checked); };
+optVoxel.onchange = () => { store('gp.voxel', optVoxel.checked); setVoxel(optVoxel.checked); syncToggles(); };
+for (const [btn, box] of [['btnScan', optScan], ['btnSmooth', optSmooth], ['btnVoxel', optVoxel]]) $(btn).onclick = () => { box.checked = !box.checked; box.onchange(); };
 opt6.onchange = () => { S.six = opt6.checked; store('gp.six', S.six); if (S.core && S.coreName === 'gpgx') { S.core.exports.web_set_port_device(0, S.six ? 0x201 : 0x101); S.core.exports.web_set_port_device(1, S.six ? 0x201 : 0x101); } toast(S.six ? 'Six-button pads on' : 'Three-button pads on'); };
 applyView(); muteIcon();
 

@@ -41,7 +41,7 @@ Emulation cores (compiled to WebAssembly): FCEUmm (NES), Snes9x (SNES), mGBA (Ga
 - Two-player keyboard defaults
 - Fast forward (hold **Tab**), pause (**Esc**), fullscreen (**F11**) and a volume control
 - Drag and drop a ROM onto the screen to play
-- Display options: scanlines (on by default), smooth pixels, and an optional **voxel style** for NES games that turns every pixel into a lit 3D block
+- Picture filters right under the screen, beside Full screen: scanlines (on by default), smooth, and an optional **voxel** view for NES games that gives every pixel depth as a lit 3D block
 
 Your library, settings and save states are kept in your browser, on your computer. Nothing is uploaded anywhere.
 

@@ -60,9 +60,10 @@ An optional view that draws the NES picture as a grid of 3D blocks instead of fl
 
 - The normal flat picture is still drawn behind the scenes every frame (the save-state thumbnails use it). The voxel view is a second canvas shown on top.
 - Each frame the page uploads the 256 by 240 picture to the graphics chip as a texture. The graphics chip then draws one small cube per pixel (about 61,000 of them) in a single instanced draw call using WebGL2. Each cube's colour is the pixel's colour, and its height is its brightness: bright pixels make tall blocks and dark ones make short ones.
-- Lighting is simple: the top faces catch a light from above-left and the sides are darker.
-- Only the faces that can be seen are drawn: the top, the front, and whichever side faces the camera. That roughly halves the work.
-- The mouse turns the view a little (side to side and up and down) and eases back to the middle when you leave the screen. The view only redraws when the picture or the camera changes.
+- The camera looks straight at the picture with a gentle perspective, so you see the tops of the blocks head-on and the sides of the blocks toward the edges. Block sides are shaded darker toward their base, which makes each pixel read as a little pillar.
+- Lighting is simple: the tops catch a light from above-left and the sides are darker.
+- Only the faces that can be seen are drawn: the top, the front or back, and the left or right side, whichever faces the camera. That roughly halves the work.
+- The mouse tilts the view a little (side to side and up and down) and it eases back to straight-on when you leave the screen. The view only redraws when the picture or the camera changes.
 - If the browser has no WebGL2, or the graphics chip resets, the option switches itself off and the flat view carries on.
 
 ## Saving
