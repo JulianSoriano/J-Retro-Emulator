@@ -359,18 +359,15 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
           <thead><tr><th>Button</th><th>Player 1</th><th>Player 2</th></tr></thead>
           <tbody id="keyRows"></tbody>
         </table>
+        <div class="opts" id="optsPanel" hidden style="margin-top:12px">
+          <label class="opt" for="opt6" id="opt6Row">Six-button pads on Genesis (X Y Z Mode) <input id="opt6" type="checkbox" checked></label>
+          <p class="hint" id="opt6Hint" style="margin:0">Turn six-button pads off if an older Genesis game ignores your input.</p>
+        </div>
         <div class="pads" id="pads"><span class="chip">No gamepad yet. Press a button on one to connect it.</span></div>
         <p class="hint">Click a key to change it. Sega and Nintendo consoles keep separate layouts. Hold Tab to fast forward, Esc to pause.</p>
         </div>
       </section>
 
-      <section class="panel" id="optsPanel" aria-labelledby="h-opts" hidden>
-        <h2 id="h-opts">Genesis input</h2>
-        <div class="opts">
-          <label class="opt" for="opt6" id="opt6Row">Six-button pads on Genesis (X Y Z Mode) <input id="opt6" type="checkbox" checked></label>
-        </div>
-        <p class="hint" id="opt6Hint">Turn six-button pads off if an older Genesis game ignores your input.</p>
-      </section>
       <div hidden><input id="optScan" type="checkbox"><input id="optSmooth" type="checkbox"><input id="optVoxel" type="checkbox"></div>
     </aside>
   </main>
