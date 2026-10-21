@@ -70,7 +70,7 @@ Three buttons sit right under the game, so you never have to scroll for them. A 
 
 - **Scanlines** (on by default): the thin dark lines of an old TV. Turn off for a clean picture.
 - **Smooth:** softens the blocky pixels.
-- **Voxel** (NES games only): shows the game as solid 3D. Characters and enemies stand up as tall blocks, the scenery is a gentle relief with soft shadows under the characters, and the status bar at the top stays flat. It looks nearly straight at the screen; move the mouse over the picture to look around, use the mouse wheel to zoom, and double-click to reset. Scanlines are hidden while it's on. It needs WebGL2 and is heavier on the graphics chip than the normal view; if the game stutters, turn it off. Save-state pictures stay flat.
+- **Voxel** (NES games only): shows the game as solid 3D. Characters and enemies stand up as tall blocks, the scenery is a gentle relief with soft shadows under the characters, and the status bar at the top stays flat. The view is fixed, looking almost straight at the screen, so it stays steady and sharp. Scanlines are hidden while it's on. It needs WebGL2 and is heavier on the graphics chip than the normal view; if the game stutters, turn it off. Save-state pictures stay flat.
 
 **Genesis input:** for Genesis games a small panel on the right has "Six-button pads". Turn it off if an older Genesis game ignores your buttons.
 

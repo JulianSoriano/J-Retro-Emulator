@@ -62,7 +62,7 @@ An optional view that rebuilds the NES picture as solid 3D, using what the conso
 - **Layers.** Scenery becomes a low stepped relief (brighter = slightly higher). Sprite pixels become tall solid blocks so characters and enemies stand out in front. Scenery just down-right of a sprite is darkened, which reads as a contact shadow.
 - **Flat status bar.** Many games park an invisible "sprite 0" under the status bar to time the screen split. When it stays put for a few frames, everything above it is drawn flat.
 - **Drawing.** The graphics chip draws one cube per pixel (about 57,000) in one instanced WebGL2 call, reading the picture and the mask as textures. Only the faces turned toward the camera are drawn.
-- **Camera.** Straight on by default with a slight lean. Moving the mouse over the screen orbits a little; the mouse wheel zooms; double-click resets.
+- **Camera.** Fixed, almost straight on with a very slight lean. Blocks sit edge to edge with no gaps and the canvas is drawn at the screen's real pixel size with no smoothing, which keeps the picture crisp.
 - The normal flat picture is still drawn behind the scenes every frame (the save-state thumbnails use it). The voxel view is a second canvas shown on top.
 
 ## Saving

@@ -776,7 +776,7 @@ function draw() {
 // save-state thumbnails); this canvas is just shown on top.
 const VOX = {
   on: false, gl: null, prog: null, vao: null, tex: null, mtex: null, u: {}, w: 0, h: 0, raf: 0, dirty: false,
-  BASE_YAW: 0.0, BASE_PITCH: -0.14, yaw: 0, pitch: -0.14, ty: 0, tp: -0.14, zoom: 1, tz: 1, px: 0, py: 0,
+  BASE_YAW: 0.0, BASE_PITCH: -0.1, yaw: 0, pitch: -0.1, ty: 0, tp: -0.1, zoom: 1, tz: 1, px: 0, py: 0,
   mask: null, hudY: 0, hudSeen: { y: -1, n: 0 }, romChr: null, romKey: null, lastMode: '',
   init() {
     const c = $('cv3');
@@ -805,7 +805,7 @@ void main() {
     bool s2 = texelFetch(uMask, ivec2(max(x - 5, 0), max(y - 5, 0)), 0).r > 0.5;
     if (s1) shade = 0.5; else if (s2) shade = 0.72;
   }
-  vec3 p = vec3(float(x) + 0.04 + aPos.x * 0.92, float(uSize.y - 1 - y) + 0.04 + aPos.y * 0.92, aPos.z * hgt);
+  vec3 p = vec3(float(x) + aPos.x, float(uSize.y - 1 - y) + aPos.y, aPos.z * hgt);
   p.xy -= vec2(uSize) * 0.5;
   vec3 r = uRot * p;
   float wc = (uDist - r.z) / uDist;                           // gentle perspective: the camera sits in front of the picture
@@ -845,14 +845,6 @@ void main() { o = vec4(vCol, 1.0); }`;
     for (const k of ['uTex', 'uMask', 'uSize', 'uHud', 'uRot', 'uScale', 'uPan', 'uDist']) this.u[k] = gl.getUniformLocation(pr, k);
     Object.assign(this, { gl, prog: pr, vao });
     c.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.gl = null; $('optVoxel').checked = false; setVoxel(false, true); store('gp.voxel', false); toast('The 3D view stopped (graphics reset). Voxel is off.'); });
-    scr.addEventListener('pointermove', (e) => {
-      if (!this.on) return; const r = scr.getBoundingClientRect();
-      const nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
-      this.ty = this.BASE_YAW + nx * 0.5; this.tp = this.BASE_PITCH + ny * 0.4; this.px = nx; this.py = ny; this.kick();
-    });
-    scr.addEventListener('pointerleave', () => { this.ty = this.BASE_YAW; this.tp = this.BASE_PITCH; this.px = this.py = 0; this.kick(); });
-    scr.addEventListener('wheel', (e) => { if (!this.on) return; e.preventDefault(); this.tz = Math.min(2.2, Math.max(1, this.tz * (e.deltaY < 0 ? 1.12 : 1 / 1.12))); this.kick(); }, { passive: false });
-    scr.addEventListener('dblclick', () => { if (!this.on) return; this.tz = 1; this.ty = this.BASE_YAW; this.tp = this.BASE_PITCH; this.kick(); });
     return true;
   },
   kick() { this.dirty = true; if (!this.raf && this.on) this.raf = requestAnimationFrame(() => this.tick()); },
@@ -966,9 +958,9 @@ void main() { o = vec4(vCol, 1.0); }`;
     gl.uniform1i(this.u.uTex, 0); gl.uniform1i(this.u.uMask, 1);
     gl.uniform2i(this.u.uSize, this.w, this.h); gl.uniform1i(this.u.uHud, this.hudY | 0);
     const z = this.zoom;
-    gl.uniform2f(this.u.uScale, 2 * z / (this.w * 1.12), 2 * z / (this.h * 1.12 * Math.max(cp, 0.9)));
+    gl.uniform2f(this.u.uScale, 2 * z / (this.w * 1.03), 2 * z / (this.h * 1.03 * Math.max(cp, 0.9)));
     gl.uniform2f(this.u.uPan, -this.px * (z - 1) * 1.6, this.py * (z - 1) * 1.6);
-    gl.uniform1f(this.u.uDist, this.w * 0.9);
+    gl.uniform1f(this.u.uDist, this.w * 3);
     const n = this.w * this.h;
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);                             // top
     gl.drawArraysInstanced(gl.TRIANGLES, m[5] > 0 ? 12 : 6, 6, n);            // front or back, whichever faces the camera
