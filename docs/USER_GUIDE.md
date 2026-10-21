@@ -64,7 +64,14 @@ Every game you open is remembered in the **Library** panel. Click one to play it
 | **F4** | Load state from the chosen slot |
 | **F11** | Full screen |
 
-**Display & input options:** scanlines (old TV look), smooth pixels, and "six-button pads on Genesis". Turn the last one off if an older Genesis game ignores your buttons.
+**Display & input options**
+
+- **Scanlines** (on by default): the thin dark lines of an old TV. Turn off for a clean picture.
+- **Smooth pixels:** softens the blocky pixels.
+- **Voxel style (NES games only):** turns every pixel into a small lit 3D block, taller where the picture is brighter, so the game looks like a little diorama. Move the mouse over the screen to look around; move it away and the view settles back. Scanlines are hidden while it's on. It needs a computer with WebGL2 (any recent browser and graphics chip) and is more work for the graphics chip than the normal view; if the game stutters, turn it off. Save-state pictures stay flat.
+- **Six-button pads on Genesis:** turn this off if an older Genesis game ignores your buttons.
+
+Your choices are remembered by the browser.
 
 ## 5. Two kinds of saving
 
@@ -103,6 +110,7 @@ Changed bytes show in gold until applied, and **Undo changes** reverts them. Edi
 | Nothing happens when I open a ROM | Check the file ending is in the table above. Some `.bin` files are not Genesis games. |
 | No sound | Click the page once (browsers block sound until you interact), and check the speaker button and volume slider. |
 | A Genesis game ignores buttons | Turn off "six-button pads". |
-| Game runs slowly | Close other heavy tabs. Fast forward (Tab) should be off. |
+| Game runs slowly | Close other heavy tabs. Fast forward (Tab) should be off. If Voxel style is on, turn it off. |
+| "Voxel style" is missing | It only appears for NES games. |
 | My saves are gone | Browser site data was probably cleared, or you're in a different browser or a private window. Restore from a downloaded state. |
 | "State from a different version" | That save was made with a different engine version and can't be loaded. |

@@ -54,6 +54,17 @@ A browser calls the page about 60 times a second. Each time:
 
 Speed is kept steady by watching that sound buffer. If it's running low the page runs an extra frame; if it's too full it waits. That keeps the game at the right speed and the sound from crackling. Fast forward simply runs 4 frames per step.
 
+## The voxel style (NES)
+
+An optional view that draws the NES picture as a grid of 3D blocks instead of flat pixels.
+
+- The normal flat picture is still drawn behind the scenes every frame (the save-state thumbnails use it). The voxel view is a second canvas shown on top.
+- Each frame the page uploads the 256 by 240 picture to the graphics chip as a texture. The graphics chip then draws one small cube per pixel (about 61,000 of them) in a single instanced draw call using WebGL2. Each cube's colour is the pixel's colour, and its height is its brightness: bright pixels make tall blocks and dark ones make short ones.
+- Lighting is simple: the top faces catch a light from above-left and the sides are darker.
+- Only the faces that can be seen are drawn: the top, the front, and whichever side faces the camera. That roughly halves the work.
+- The mouse turns the view a little (side to side and up and down) and eases back to the middle when you leave the screen. The view only redraws when the picture or the camera changes.
+- If the browser has no WebGL2, or the graphics chip resets, the option switches itself off and the flat view carries on.
+
 ## Saving
 
 There are two kinds, and both are stored in your browser's **IndexedDB** (a small database that belongs to the page's site).

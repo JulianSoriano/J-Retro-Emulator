@@ -107,6 +107,9 @@ svg.i { width: 16px; height: 16px; flex: none; }
 .screen.smooth canvas { image-rendering: auto; }
 .scan { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(180deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.28) 2px 3px); display: none; }
 .screen.scanlines .scan { display: block; }
+.screen.voxel .scan { display: none; }
+.screen.voxel #cv { visibility: hidden; }
+.screen #cv3 { image-rendering: auto; }
 .screen:fullscreen { position: static; transform: none; aspect-ratio: auto; width: 100%; height: 100%; background: #000; border-radius: 0; }
 .screen:fullscreen canvas { inset: 0; margin: auto; width: min(100vw, calc(100vh * var(--ar))); height: min(calc(100vw / var(--ar)), 100vh); }
 .overlay {
@@ -255,6 +258,7 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
         <div class="stage" id="stage">
           <div class="screen" id="screen">
             <canvas id="cv" width="320" height="224" aria-label="Game display"></canvas>
+            <canvas id="cv3" hidden aria-hidden="true"></canvas>
             <div class="scan"></div>
             <div class="overlay" id="overlay" hidden>
               <div><strong id="ovTitle">Paused</strong><p id="ovText">Press Esc or the Play button to continue.</p></div>
@@ -328,8 +332,10 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
         <div class="opts">
           <label class="opt" for="optScan">Scanlines <input id="optScan" type="checkbox"></label>
           <label class="opt" for="optSmooth">Smooth pixels <input id="optSmooth" type="checkbox"></label>
+          <label class="opt" for="optVoxel" id="optVoxelRow">Voxel style (NES games) <input id="optVoxel" type="checkbox"></label>
           <label class="opt" for="opt6" id="opt6Row">Six-button pads on Genesis (X Y Z Mode) <input id="opt6" type="checkbox" checked></label>
         </div>
+        <p class="hint" id="optVoxelHint">Turns every pixel into a lit 3D block, taller where the picture is brighter. Move the mouse over the screen to look around.</p>
         <p class="hint" id="opt6Hint">Turn six-button pads off if an older Genesis game ignores your input.</p>
       </section>
     </aside>
@@ -748,6 +754,121 @@ function draw() {
   const f = S.core.frame();
   if (!img || img.width !== f.w || img.height !== f.h) { cv.width = f.w; cv.height = f.h; img = g2d.createImageData(f.w, f.h); }
   img.data.set(f.data); g2d.putImageData(img, 0, 0);
+  if (VOX.on) VOX.frame(f);
+}
+
+/* ---------- voxel style (optional, NES) ---------- */
+// Each pixel of the game picture becomes a small lit block; brighter pixels make taller blocks.
+// Drawn with WebGL2 (one instanced cube per pixel). The normal 2D canvas keeps running underneath
+// (it feeds the save-state thumbnails), the voxel canvas is just shown on top.
+const VOX = {
+  on: false, gl: null, prog: null, tex: null, vao: null, u: {}, w: 0, h: 0, dirty: false, raf: 0,
+  yaw: 0, pitch: 0.5, ty: 0, tp: 0.5,
+  init() {
+    const c = $('cv3');
+    const gl = c.getContext('webgl2', { antialias: true, alpha: false });
+    if (!gl) return false;
+    const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+    const vs = `#version 300 es
+precision highp float;
+uniform highp sampler2D uTex; uniform ivec2 uSize; uniform mat3 uRot; uniform vec2 uScale; uniform float uH;
+in vec3 aPos; in vec3 aNrm;
+out vec3 vCol;
+void main() {
+  int id = gl_InstanceID; int x = id % uSize.x; int y = id / uSize.x;
+  vec3 c = texelFetch(uTex, ivec2(x, y), 0).rgb;
+  float lum = dot(c, vec3(0.299, 0.587, 0.114));
+  float hgt = 0.6 + lum * uH;
+  vec3 p = vec3(float(x) + 0.05 + aPos.x * 0.9, float(uSize.y - 1 - y) + 0.05 + aPos.y * 0.9, aPos.z * hgt);
+  p.xy -= vec2(uSize) * 0.5;
+  vec3 r = uRot * p;
+  gl_Position = vec4(r.x * uScale.x, r.y * uScale.y, -r.z / float(uSize.x), 1.0);
+  vec3 n = uRot * aNrm;
+  float l = 0.5 + 0.55 * max(dot(normalize(n), normalize(vec3(-0.35, 0.55, 0.75))), 0.0);
+  vCol = c * l;
+}`;
+    const fs = `#version 300 es
+precision mediump float;
+in vec3 vCol; out vec4 o;
+void main() { o = vec4(vCol, 1.0); }`;
+    const pr = gl.createProgram();
+    gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs));
+    gl.bindAttribLocation(pr, 0, 'aPos'); gl.bindAttribLocation(pr, 1, 'aNrm');
+    gl.linkProgram(pr); if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+    // Cube faces, 2 triangles each. The camera always looks from the front and above, so the back face is never
+    // needed, and only one of the two side faces is visible at a time (chosen in render()).
+    const faces = [
+      [[0,0,1],[1,0,1],[1,1,1],[0,1,1],[0,0,1]],   // top        (vertices 0-5)
+      [[0,0,0],[0,0,1],[1,0,1],[1,0,0],[0,-1,0]],   // front      (6-11)
+      [[0,0,0],[0,1,0],[0,1,1],[0,0,1],[-1,0,0]],   // left side  (12-17)
+      [[1,0,0],[1,0,1],[1,1,1],[1,1,0],[1,0,0]],   // right side (18-23)
+    ];
+    const v = [];
+    for (const f of faces) { const q = f.slice(0, 4), n = f[4]; for (const i of [0, 1, 2, 0, 2, 3]) v.push(...q[i], ...n); }
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
+    this.nverts = v.length / 6;
+    const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    for (const k of ['uTex', 'uSize', 'uRot', 'uScale', 'uH']) this.u[k] = gl.getUniformLocation(pr, k);
+    Object.assign(this, { gl, prog: pr, tex, vao });
+    c.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.gl = null; setVoxel(false, true); toast('The 3D view stopped (graphics reset). Voxel style is off.'); });
+    scr.addEventListener('pointermove', (e) => {
+      if (!this.on) return; const r = scr.getBoundingClientRect();
+      const nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
+      this.ty = nx * 0.8; this.tp = 0.5 + ny * 0.5; this.kick();
+    });
+    scr.addEventListener('pointerleave', () => { this.ty = 0; this.tp = 0.5; this.kick(); });
+    return true;
+  },
+  kick() { this.dirty = true; if (!this.raf && this.on) this.raf = requestAnimationFrame(() => this.tick()); },
+  tick() {
+    this.raf = 0; if (!this.on) return;
+    this.yaw += (this.ty - this.yaw) * 0.18; this.pitch += (this.tp - this.pitch) * 0.18;
+    const moving = Math.abs(this.ty - this.yaw) > 0.002 || Math.abs(this.tp - this.pitch) > 0.002;
+    if (this.dirty || moving) this.render();
+    if (moving) this.raf = requestAnimationFrame(() => this.tick());
+  },
+  frame(f) {
+    const gl = this.gl; if (!gl) return;
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    if (this.w !== f.w || this.h !== f.h) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, f.data); this.w = f.w; this.h = f.h; }
+    else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, f.w, f.h, gl.RGBA, gl.UNSIGNED_BYTE, f.data);
+    this.render();
+  },
+  render() {
+    const gl = this.gl, c = $('cv3'); if (!gl || !this.w) return;
+    this.dirty = false;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = Math.max(2, Math.round(c.clientWidth * dpr)), H = Math.max(2, Math.round(c.clientHeight * dpr));
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    gl.viewport(0, 0, W, H); gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+    gl.clearColor(0.04, 0.04, 0.06, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.useProgram(this.prog); gl.bindVertexArray(this.vao); gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    // turn about the vertical axis (yaw), then lean the top of the picture away (pitch); column-major mat3
+    const Rz = [cy, 0, -sy, 0, 1, 0, sy, 0, cy], Rx = [1, 0, 0, 0, cp, -sp, 0, sp, cp];
+    const m = new Array(9).fill(0);
+    for (let c2 = 0; c2 < 3; c2++) for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) m[c2 * 3 + r] += Rx[k * 3 + r] * Rz[c2 * 3 + k];
+    gl.uniformMatrix3fv(this.u.uRot, false, m);
+    gl.uniform1i(this.u.uTex, 0); gl.uniform2i(this.u.uSize, this.w, this.h);
+    gl.uniform2f(this.u.uScale, 2 / (this.w * 1.06), 2 / (this.h * 1.06 * Math.max(cp, 0.75))); gl.uniform1f(this.u.uH, 9);
+    const n = this.w * this.h;
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 12, n);                            // top + front
+    gl.drawArraysInstanced(gl.TRIANGLES, m[2] > 0 ? 18 : 12, 6, n);           // the side that faces the camera
+  },
+};
+function setVoxel(on, quiet) {
+  if (on) {
+    try { if (!VOX.gl && !VOX.init()) throw new Error('no webgl2'); }
+    catch (e) { VOX.gl = null; $('optVoxel').checked = false; if (!quiet) toast('This browser or graphics card cannot show the voxel style.'); on = false; }
+  }
+  VOX.on = !!on && S.sys === 'nes';
+  $('cv3').hidden = !VOX.on; scr.classList.toggle('voxel', VOX.on);
+  if (VOX.on && S.core && S.running) { VOX.w = 0; draw(); }
 }
 function setAspect(ar) {
   if (!(ar > 0.5 && ar < 3)) ar = 4 / 3;
@@ -1010,6 +1131,8 @@ function renderTouch() {
 function renderOpts() {
   const sega = SYSTEMS[S.sys].core === 'gpgx';
   $('opt6Row').hidden = !sega; $('opt6Hint').hidden = !sega;
+  const nes = S.sys === 'nes'; $('optVoxelRow').hidden = !nes; $('optVoxelHint').hidden = !nes;
+  if (typeof optVoxel !== 'undefined') setVoxel(optVoxel.checked, true);
 }
 
 /* ---------- events ---------- */
@@ -1065,10 +1188,12 @@ $('btnMute').onclick = (e) => { e.preventDefault(); A.muted = !A.muted; store('g
 $('btnKeysReset').onclick = () => { const fam = pad().family; keymaps[fam] = clone(DEFAULT_KEYS[fam]); store(KEY_STORE[fam], keymaps[fam]); renderKeys(); toast(pad().title + ' set back to defaults'); };
 
 const optScan = $('optScan'), optSmooth = $('optSmooth'), opt6 = $('opt6');
-optScan.checked = !!store('gp.scan'); optSmooth.checked = !!store('gp.smooth'); opt6.checked = S.six;
+optScan.checked = store('gp.scan') !== false; optSmooth.checked = !!store('gp.smooth'); opt6.checked = S.six;
+const optVoxel = $('optVoxel'); optVoxel.checked = !!store('gp.voxel');
 const applyView = () => { scr.classList.toggle('scanlines', optScan.checked); scr.classList.toggle('smooth', optSmooth.checked); };
 optScan.onchange = () => { store('gp.scan', optScan.checked); applyView(); };
 optSmooth.onchange = () => { store('gp.smooth', optSmooth.checked); applyView(); };
+optVoxel.onchange = () => { store('gp.voxel', optVoxel.checked); setVoxel(optVoxel.checked); };
 opt6.onchange = () => { S.six = opt6.checked; store('gp.six', S.six); if (S.core && S.coreName === 'gpgx') { S.core.exports.web_set_port_device(0, S.six ? 0x201 : 0x101); S.core.exports.web_set_port_device(1, S.six ? 0x201 : 0x101); } toast(S.six ? 'Six-button pads on' : 'Three-button pads on'); };
 applyView(); muteIcon();
 
