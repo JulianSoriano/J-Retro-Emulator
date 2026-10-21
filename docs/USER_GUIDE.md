@@ -15,6 +15,8 @@ You need a ROM file, which is a copy of a game you own (this project includes no
 - press **Open ROM** (top right) and pick the file, or
 - **drag the file** onto the screen.
 
+**From Google Drive:** if the **Google Drive** button is showing (online version only), press it, sign in to Google, and pick a game or zip from your Drive. The emulator downloads just that file; it can't see the rest of your Drive. (If you run your own copy, see [Google Drive setup](GOOGLE_DRIVE_SETUP.md).)
+
 You can pick a `.zip` too; the emulator takes the game out of it. The console is chosen from the file ending:
 
 | Console | File endings |
@@ -100,6 +102,8 @@ Changed bytes show in gold until applied, and **Undo changes** reverts them. Edi
 
 | Problem | What to try |
 |---|---|
+| No Google Drive button | It only appears on the online version, and only once the site owner has finished the Google setup. |
+| Google says the app isn't verified or access is blocked | The site is in testing mode: continue past the warning, and ask the site owner to add your email as a test user. |
 | Nothing happens when I open a ROM | Check the file ending is in the table above. Some `.bin` files are not Genesis games. |
 | No sound | Click the page once (browsers block sound until you interact), and check the speaker button and volume slider. |
 | A Genesis game ignores buttons | Turn off "six-button pads". |
