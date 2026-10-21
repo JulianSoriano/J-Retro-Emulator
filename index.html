@@ -247,10 +247,6 @@ dialog.ed::backdrop { background: rgba(4,5,8,.7); }
       Open ROM
     </label>
     <input id="file" class="vh" type="file">
-    <button class="btn" id="btnDrive" hidden title="Choose a game from your Google Drive">
-      <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l6 10-4 7H6l-4-7z"/><path d="M8 3l6 10M16 3L10 13M2 13h12"/></svg>
-      Google Drive
-    </button>
   </header>
 
   <main class="deck">
@@ -880,57 +876,6 @@ async function openFile(file) {
     if (await startGame(bytes, name)) toast('Loaded ' + S.rom.title);
   } catch (e) { S.busy = false; toast(e.message || 'Could not open that file.'); }
 }
-
-/* ---------- Google Drive (optional) ---------- */
-// Fill these three in (see docs/GOOGLE_DRIVE_SETUP.md). They are public identifiers, safe to keep in the page.
-// While any is empty the Google Drive button stays hidden. It only works on a web address (https://...), not a file opened from disk.
-const GOOGLE = { clientId: '', apiKey: '', projectNumber: '' };
-const GD = { token: null, exp: 0, tc: null };
-const gdReady = () => !!(GOOGLE.clientId && GOOGLE.apiKey && GOOGLE.projectNumber) && /^https?:$/.test(location.protocol);
-async function gdToken() {
-  if (GD.token && Date.now() < GD.exp - 60000) return GD.token;
-  try { await loadScript('https://accounts.google.com/gsi/client'); } catch (e) { throw new Error('Could not reach Google. Check your internet connection.'); }
-  return new Promise((res, rej) => {
-    GD.tc = GD.tc || google.accounts.oauth2.initTokenClient({ client_id: GOOGLE.clientId, scope: 'https://www.googleapis.com/auth/drive.file', callback: () => {} });
-    GD.tc.callback = (r) => {
-      if (r.error) return rej(new Error(r.error === 'access_denied' ? 'Google sign-in was cancelled.' : 'Google sign-in failed (' + r.error + ').'));
-      GD.token = r.access_token; GD.exp = Date.now() + (r.expires_in || 3600) * 1000; res(GD.token);
-    };
-    GD.tc.error_callback = (e) => rej(new Error(e && e.type === 'popup_closed' ? 'Google sign-in was cancelled.' : 'The Google sign-in window could not open. Allow pop-ups for this page.'));
-    GD.tc.requestAccessToken({});
-  });
-}
-async function gdPick(token) {
-  try {
-    await loadScript('https://apis.google.com/js/api.js');
-    await new Promise((res, rej) => gapi.load('picker', { callback: res, onerror: rej }));
-  } catch (e) { throw new Error('Could not load the Google file picker.'); }
-  return new Promise((res) => {
-    const view = new google.picker.DocsView().setIncludeFolders(true).setSelectFolderEnabled(false);
-    new google.picker.PickerBuilder()
-      .setAppId(GOOGLE.projectNumber).setOAuthToken(token).setDeveloperKey(GOOGLE.apiKey)
-      .setTitle('Choose a game or a zip file').addView(view)
-      .setCallback((d) => { if (d.action === 'picked') res(d.docs[0]); else if (d.action === 'cancel') res(null); })
-      .build().setVisible(true);
-  });
-}
-async function openFromDrive() {
-  if (S.busy) return;
-  A.start();
-  try {
-    const token = await gdToken();
-    const doc = await gdPick(token);
-    if (!doc) return;
-    if (doc.sizeBytes && +doc.sizeBytes > 64 * 1048576) { toast('That file is larger than any cartridge these consoles used.'); return; }
-    toast('Downloading ' + doc.name + ' from Google Drive…');
-    const r = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(doc.id) + '?alt=media&supportsAllDrives=true', { headers: { Authorization: 'Bearer ' + token } });
-    if (r.status === 401) { GD.token = null; throw new Error('Your Google sign-in expired. Press Google Drive to try again.'); }
-    if (!r.ok) throw new Error('Google Drive would not give us that file (error ' + r.status + ').');
-    await openFile(new File([await r.blob()], doc.name));
-  } catch (e) { S.busy = false; toast(e.message || 'Could not open that file from Google Drive.'); }
-}
-$('btnDrive').hidden = !gdReady();
-$('btnDrive').addEventListener('click', openFromDrive);
 
 /* ---------- pause / transport ---------- */
 function setPaused(p) {

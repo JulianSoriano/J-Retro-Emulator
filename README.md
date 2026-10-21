@@ -7,7 +7,6 @@ An all-in-one retro emulator for Nintendo and Sega consoles and handhelds that r
 ## Documentation
 
 - **[User guide](docs/USER_GUIDE.md):** how to load games, controls, save states, backups and the state editor, with troubleshooting
-- **[Google Drive setup](docs/GOOGLE_DRIVE_SETUP.md):** one-time steps to switch on the optional "open a ROM from Google Drive" button
 - **[How it works](docs/HOW_IT_WORKS.md):** what is inside, how a game runs, how saving works and how the one-file build is made
 
 ## Quick start
@@ -42,7 +41,6 @@ Emulation cores (compiled to WebAssembly): FCEUmm (NES), Snes9x (SNES), mGBA (Ga
 - Two-player keyboard defaults
 - Fast forward (hold **Tab**), pause (**Esc**), fullscreen (**F11**) and a volume control
 - Drag and drop a ROM onto the screen to play
-- Optional: open a ROM straight from your Google Drive (needs a one-time setup, see the docs)
 
 Your library, settings and save states are kept in your browser, on your computer. Nothing is uploaded anywhere.
 
@@ -100,7 +98,7 @@ No games are included. Use ROMs from cartridges you own. Dumping your own cartri
 | `src/index.html` | The readable app source |
 | `src/cores/` | The four emulation cores (WebAssembly) |
 | `tools/build_single_file.py` | Builds `index.html` from `src/` |
-| `docs/` | User guide, Google Drive setup and how-it-works |
+| `docs/` | User guide and how-it-works |
 
 To rebuild after editing the source: `python3 tools/build_single_file.py`
 

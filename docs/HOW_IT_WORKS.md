@@ -54,16 +54,6 @@ A browser calls the page about 60 times a second. Each time:
 
 Speed is kept steady by watching that sound buffer. If it's running low the page runs an extra frame; if it's too full it waits. That keeps the game at the right speed and the sound from crackling. Fast forward simply runs 4 frames per step.
 
-## Opening a game from Google Drive
-
-This is optional and only active once the three values in `GOOGLE` are filled in (see [Google Drive setup](GOOGLE_DRIVE_SETUP.md)).
-
-1. Pressing the button loads Google's sign-in script, then asks Google for a short-lived access token with the narrow `drive.file` permission.
-2. It loads Google's file picker and shows it. The player chooses a file; choosing it is what gives the page access to that one file.
-3. The page downloads the file straight from the Google Drive API using that token, wraps it as an ordinary file and hands it to the same loader used for Open ROM. From there everything is identical to opening a file from disk.
-
-The token lives only in memory, so closing the page signs the emulator out. Google's scripts are fetched only when the button is pressed, so the rest of the emulator stays fully offline. The button is hidden on a file opened from disk, because Google only allows sign-in from a registered web address.
-
 ## Saving
 
 There are two kinds, and both are stored in your browser's **IndexedDB** (a small database that belongs to the page's site).
