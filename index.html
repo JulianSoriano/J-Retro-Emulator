@@ -764,13 +764,20 @@ function draw() {
   if (VOX.on) VOX.frame(f);
 }
 
-/* ---------- voxel style (optional, NES) ---------- */
-// Each pixel of the game picture becomes a small lit block; brighter pixels make taller blocks.
-// Drawn with WebGL2 (one instanced cube per pixel). The normal 2D canvas keeps running underneath
-// (it feeds the save-state thumbnails), the voxel canvas is just shown on top.
+/* ---------- voxel view (optional, NES) ---------- */
+// Instead of guessing from the finished picture alone, this view also reads the NES's own sprite list
+// (OAM) and graphics data out of the console's save state. That lets it tell characters and enemies
+// (sprites) from the scenery:
+//   - the scenery is a stepped relief: brighter areas sit a little higher
+//   - every sprite pixel becomes a solid, tall block, so characters stand out in front of the scenery
+//   - sprites cast a soft shadow onto the scenery behind them
+//   - a status bar (found from the game's "sprite 0" split marker) stays perfectly flat
+// Drawn with WebGL2, one instanced cube per pixel. The flat 2D canvas keeps running underneath (it feeds the
+// save-state thumbnails); this canvas is just shown on top.
 const VOX = {
-  on: false, gl: null, prog: null, tex: null, vao: null, u: {}, w: 0, h: 0, dirty: false, raf: 0,
-  yaw: 0, pitch: 0, ty: 0, tp: 0,
+  on: false, gl: null, prog: null, vao: null, tex: null, mtex: null, u: {}, w: 0, h: 0, raf: 0, dirty: false,
+  BASE_YAW: 0.0, BASE_PITCH: -0.14, yaw: 0, pitch: -0.14, ty: 0, tp: -0.14, zoom: 1, tz: 1, px: 0, py: 0,
+  mask: null, hudY: 0, hudSeen: { y: -1, n: 0 }, romChr: null, romKey: null, lastMode: '',
   init() {
     const c = $('cv3');
     const gl = c.getContext('webgl2', { antialias: true, alpha: false });
@@ -778,23 +785,35 @@ const VOX = {
     const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
     const vs = `#version 300 es
 precision highp float;
-uniform highp sampler2D uTex; uniform ivec2 uSize; uniform mat3 uRot; uniform vec2 uScale; uniform float uH; uniform float uDist;
+uniform highp sampler2D uTex; uniform highp sampler2D uMask;
+uniform ivec2 uSize; uniform int uHud; uniform mat3 uRot; uniform vec2 uScale; uniform vec2 uPan; uniform float uDist;
 in vec3 aPos; in vec3 aNrm;
 out vec3 vCol;
 void main() {
   int id = gl_InstanceID; int x = id % uSize.x; int y = id / uSize.x;
   vec3 c = texelFetch(uTex, ivec2(x, y), 0).rgb;
   float lum = dot(c, vec3(0.299, 0.587, 0.114));
-  float hgt = 0.8 + lum * uH;
-  vec3 p = vec3(float(x) + 0.05 + aPos.x * 0.9, float(uSize.y - 1 - y) + 0.05 + aPos.y * 0.9, aPos.z * hgt);
+  bool hud = y < uHud;
+  bool spr = !hud && texelFetch(uMask, ivec2(x, y), 0).r > 0.5;
+  float hgt;
+  if (hud) hgt = 0.6;                                         // status bar: flat
+  else if (spr) hgt = 7.0 + lum * 0.8;                        // characters and enemies: tall blocks
+  else hgt = 0.7 + floor(lum * 3.0 + 0.5) * 0.7;              // scenery: gentle steps by brightness
+  float shade = 1.0;
+  if (!hud && !spr) {                                         // soft shadow from a sprite up and to the left
+    bool s1 = texelFetch(uMask, ivec2(max(x - 3, 0), max(y - 3, 0)), 0).r > 0.5;
+    bool s2 = texelFetch(uMask, ivec2(max(x - 5, 0), max(y - 5, 0)), 0).r > 0.5;
+    if (s1) shade = 0.5; else if (s2) shade = 0.72;
+  }
+  vec3 p = vec3(float(x) + 0.04 + aPos.x * 0.92, float(uSize.y - 1 - y) + 0.04 + aPos.y * 0.92, aPos.z * hgt);
   p.xy -= vec2(uSize) * 0.5;
   vec3 r = uRot * p;
-  float wc = (uDist - r.z) / uDist;                       // gentle perspective: the camera sits in front of the picture
-  gl_Position = vec4(r.x * uScale.x, r.y * uScale.y, -r.z / float(uSize.x) * wc, wc);
+  float wc = (uDist - r.z) / uDist;                           // gentle perspective: the camera sits in front of the picture
+  gl_Position = vec4(r.x * uScale.x + uPan.x * wc, r.y * uScale.y + uPan.y * wc, -r.z / float(uSize.x) * wc, wc);
   vec3 n = uRot * aNrm;
-  float l = 0.62 + 0.45 * max(dot(normalize(n), normalize(vec3(-0.3, 0.45, 0.85))), 0.0);
-  if (abs(aNrm.z) < 0.5) l *= mix(0.5, 1.0, aPos.z);   // block sides get darker toward the base, which gives each pixel visible depth
-  vCol = c * l;
+  float l = 0.64 + 0.42 * max(dot(normalize(n), normalize(vec3(-0.3, 0.45, 0.85))), 0.0);
+  if (abs(aNrm.z) < 0.5) l *= mix(0.5, 1.0, aPos.z);          // block sides darken toward their base
+  vCol = c * l * shade;
 }`;
     const fs = `#version 300 es
 precision mediump float;
@@ -804,7 +823,7 @@ void main() { o = vec4(vCol, 1.0); }`;
     gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs));
     gl.bindAttribLocation(pr, 0, 'aPos'); gl.bindAttribLocation(pr, 1, 'aNrm');
     gl.linkProgram(pr); if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
-    // Cube faces, 2 triangles each. Only the faces turned toward the camera are drawn (top, then front or back, then left or right; chosen in render()).
+    // Cube faces, 2 triangles each. Only the faces turned toward the camera are drawn (top, then front or back, then left or right).
     const faces = [
       [[0,0,1],[1,0,1],[1,1,1],[0,1,1],[0,0,1]],   // top        (vertices 0-5)
       [[0,0,0],[0,0,1],[1,0,1],[1,0,0],[0,-1,0]],   // front      (6-11)
@@ -818,34 +837,113 @@ void main() { o = vec4(vCol, 1.0); }`;
     const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
     gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
-    this.nverts = v.length / 6;
-    const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    for (const k of ['uTex', 'uSize', 'uRot', 'uScale', 'uH', 'uDist']) this.u[k] = gl.getUniformLocation(pr, k);
-    Object.assign(this, { gl, prog: pr, tex, vao });
-    c.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.gl = null; setVoxel(false, true); toast('The 3D view stopped (graphics reset). Voxel style is off.'); });
+    const mk = () => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t; };
+    this.tex = mk(); this.mtex = mk();
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    for (const k of ['uTex', 'uMask', 'uSize', 'uHud', 'uRot', 'uScale', 'uPan', 'uDist']) this.u[k] = gl.getUniformLocation(pr, k);
+    Object.assign(this, { gl, prog: pr, vao });
+    c.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.gl = null; $('optVoxel').checked = false; setVoxel(false, true); store('gp.voxel', false); toast('The 3D view stopped (graphics reset). Voxel is off.'); });
     scr.addEventListener('pointermove', (e) => {
       if (!this.on) return; const r = scr.getBoundingClientRect();
       const nx = (e.clientX - r.left) / r.width - 0.5, ny = (e.clientY - r.top) / r.height - 0.5;
-      this.ty = nx * 0.4; this.tp = ny * 0.35; this.kick();
+      this.ty = this.BASE_YAW + nx * 0.5; this.tp = this.BASE_PITCH + ny * 0.4; this.px = nx; this.py = ny; this.kick();
     });
-    scr.addEventListener('pointerleave', () => { this.ty = 0; this.tp = 0; this.kick(); });
+    scr.addEventListener('pointerleave', () => { this.ty = this.BASE_YAW; this.tp = this.BASE_PITCH; this.px = this.py = 0; this.kick(); });
+    scr.addEventListener('wheel', (e) => { if (!this.on) return; e.preventDefault(); this.tz = Math.min(2.2, Math.max(1, this.tz * (e.deltaY < 0 ? 1.12 : 1 / 1.12))); this.kick(); }, { passive: false });
+    scr.addEventListener('dblclick', () => { if (!this.on) return; this.tz = 1; this.ty = this.BASE_YAW; this.tp = this.BASE_PITCH; this.kick(); });
     return true;
   },
   kick() { this.dirty = true; if (!this.raf && this.on) this.raf = requestAnimationFrame(() => this.tick()); },
   tick() {
     this.raf = 0; if (!this.on) return;
-    this.yaw += (this.ty - this.yaw) * 0.18; this.pitch += (this.tp - this.pitch) * 0.18;
-    const moving = Math.abs(this.ty - this.yaw) > 0.002 || Math.abs(this.tp - this.pitch) > 0.002;
+    this.yaw += (this.ty - this.yaw) * 0.18; this.pitch += (this.tp - this.pitch) * 0.18; this.zoom += (this.tz - this.zoom) * 0.2;
+    const moving = Math.abs(this.ty - this.yaw) > 0.002 || Math.abs(this.tp - this.pitch) > 0.002 || Math.abs(this.tz - this.zoom) > 0.003;
     if (this.dirty || moving) this.render();
     if (moving) this.raf = requestAnimationFrame(() => this.tick());
   },
+  // --- reading the console's own data ---
+  // The save state is a list of sections, each holding named items: [id][size] then [name x4][size x4][data].
+  readState() {
+    const d = S.core.saveState(); if (!d) return null;
+    const dv = new DataView(d.buffer, d.byteOffset, d.byteLength), got = {};
+    let o = 16;
+    while (o + 5 <= d.length) {
+      const end = o + 5 + dv.getUint32(o + 1, true); let q = o + 5;
+      while (q + 8 <= end && end <= d.length) {
+        const name = String.fromCharCode(d[q], d[q + 1], d[q + 2], d[q + 3]).replace(/\0+$/, ''), sz = dv.getUint32(q + 4, true);
+        if (name === 'SPRA' || name === 'PPUR' || name === 'CHRR') got[name] = d.subarray(q + 8, q + 8 + sz);
+        q += 8 + sz;
+      }
+      o = end;
+    }
+    return got.SPRA && got.PPUR ? got : null;
+  },
+  // Picture data (CHR) for cartridges that have none in the save state: only the simplest case (mapper 0).
+  romChrFor() {
+    const b = S.romBytes; if (!b || b.length < 16 || b[0] !== 0x4e || b[1] !== 0x45 || b[2] !== 0x53) return null;
+    if (this.romKey === b) return this.romChr;
+    this.romKey = b; this.romChr = null;
+    const mapper = (b[6] >> 4) | (b[7] & 0xf0), prg = b[4] * 16384, chr = b[5];
+    if (mapper === 0 && chr === 1) { const st = 16 + ((b[6] & 4) ? 512 : 0) + prg; this.romChr = b.subarray(st, st + 8192); }
+    return this.romChr;
+  },
+  // Work out which picture pixels belong to sprites. Returns false when there's nothing usable.
+  layers(f) {
+    const st = this.readState(); const w = f.w, h = f.h;
+    if (!this.mask || this.mask.length !== w * h) this.mask = new Uint8Array(w * h);
+    const mask = this.mask; mask.fill(0);
+    if (!st) { this.hudY = 0; return; }
+    const oam = st.SPRA, ctrl = st.PPUR[0], tall = (ctrl & 0x20) !== 0, sh = tall ? 16 : 8, tbl8 = (ctrl & 0x08) ? 0x1000 : 0;
+    const top = f.h === 224 ? 8 : 0;                           // the picture is cropped by 8 rows top and bottom
+    // The status bar: many games park "sprite 0" (drawn behind the picture) right under it to time the split.
+    const y0 = oam[0], pri0 = (oam[2] & 0x20) !== 0;
+    if (pri0 && y0 < 0xef) { const y = y0 + 1 - top; if (this.hudSeen.y === y) this.hudSeen.n++; else this.hudSeen = { y, n: 0 }; if (this.hudSeen.n >= 6 && y > 4 && y < 110) this.hudY = y + 8; }
+    else { this.hudSeen = { y: -1, n: 0 }; if (!pri0) this.hudY = 0; }
+    const chr = (st.CHRR && st.CHRR.length === 8192) ? st.CHRR : this.romChrFor();
+    const px = new Uint32Array(f.data.buffer, f.data.byteOffset, w * h);
+    for (let i = (this.hudY ? 0 : 0); i < 64; i++) {
+      const sy = oam[i * 4], tile = oam[i * 4 + 1], at = oam[i * 4 + 2], sx = oam[i * 4 + 3];
+      if (sy >= 0xef || (i === 0 && (at & 0x20))) continue;
+      const fy = sy + 1 - top; if (fy + sh <= 0 || fy >= h) continue;
+      if (chr) {
+        const base = tall ? ((tile & 1) ? 0x1000 : 0) : tbl8;
+        for (let r = 0; r < sh; r++) {
+          const yy = fy + r; if (yy < 0 || yy >= h) continue;
+          const sr = (at & 0x80) ? sh - 1 - r : r;
+          const t = tall ? (tile & 0xfe) + (sr >= 8 ? 1 : 0) : tile, a = base + t * 16 + (sr & 7);
+          const p0 = chr[a], p1 = chr[a + 8];
+          for (let c = 0; c < 8; c++) {
+            const xx = sx + c; if (xx >= w) break;
+            const sc = (at & 0x40) ? c : 7 - c;
+            if (((p0 >> sc) | (p1 >> sc)) & 1) mask[yy * w + xx] = 1;
+          }
+        }
+      } else {
+        // No picture data available: treat everything in the sprite's box that differs from the surrounding colour as sprite.
+        const x1 = Math.min(w, sx + 8), y1 = Math.min(h, fy + sh), counts = new Map();
+        const ring = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const v = px[y * w + x]; counts.set(v, (counts.get(v) || 0) + 1); };
+        for (let x = sx - 1; x <= x1; x++) { ring(x, fy - 1); ring(x, y1); }
+        for (let y = fy; y < y1; y++) { ring(sx - 1, y); ring(x1, y); }
+        let bg = null, best = 0; for (const [k, n] of counts) if (n > best) { best = n; bg = k; }
+        for (let y = Math.max(0, fy); y < y1; y++) for (let x = sx; x < x1; x++) if (bg === null || px[y * w + x] !== bg) mask[y * w + x] = 1;
+      }
+    }
+    return;
+  },
   frame(f) {
     const gl = this.gl; if (!gl) return;
-    gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    if (this.w !== f.w || this.h !== f.h) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, f.data); this.w = f.w; this.h = f.h; }
+    this.layers(f);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    if (this.w !== f.w || this.h !== f.h) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, f.data);
     else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, f.w, f.h, gl.RGBA, gl.UNSIGNED_BYTE, f.data);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.mtex);
+    const m = this.mask;
+    const big = new Uint8Array(m.length); for (let i = 0; i < m.length; i++) big[i] = m[i] ? 255 : 0;
+    if (this.w !== f.w || this.h !== f.h) gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, f.w, f.h, 0, gl.RED, gl.UNSIGNED_BYTE, big);
+    else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, f.w, f.h, gl.RED, gl.UNSIGNED_BYTE, big);
+    this.w = f.w; this.h = f.h;
     this.render();
   },
   render() {
@@ -856,15 +954,21 @@ void main() { o = vec4(vCol, 1.0); }`;
     if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
     gl.viewport(0, 0, W, H); gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
     gl.clearColor(0.04, 0.04, 0.06, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.useProgram(this.prog); gl.bindVertexArray(this.vao); gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.useProgram(this.prog); gl.bindVertexArray(this.vao);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.mtex);
     const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    // turn about the vertical axis (yaw), then lean the top of the picture away (pitch); column-major mat3
-    const Rz = [cy, 0, -sy, 0, 1, 0, sy, 0, cy], Rx = [1, 0, 0, 0, cp, -sp, 0, sp, cp];
+    // turn about the vertical axis (yaw), then lean the picture (pitch); column-major mat3
+    const Ry = [cy, 0, -sy, 0, 1, 0, sy, 0, cy], Rx = [1, 0, 0, 0, cp, -sp, 0, sp, cp];
     const m = new Array(9).fill(0);
-    for (let c2 = 0; c2 < 3; c2++) for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) m[c2 * 3 + r] += Rx[k * 3 + r] * Rz[c2 * 3 + k];
+    for (let c2 = 0; c2 < 3; c2++) for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) m[c2 * 3 + r] += Rx[k * 3 + r] * Ry[c2 * 3 + k];
     gl.uniformMatrix3fv(this.u.uRot, false, m);
-    gl.uniform1i(this.u.uTex, 0); gl.uniform2i(this.u.uSize, this.w, this.h);
-    gl.uniform2f(this.u.uScale, 2 / (this.w * 1.04), 2 / (this.h * 1.04 * Math.max(cp, 0.9))); gl.uniform1f(this.u.uH, 5); gl.uniform1f(this.u.uDist, this.w * 0.9);
+    gl.uniform1i(this.u.uTex, 0); gl.uniform1i(this.u.uMask, 1);
+    gl.uniform2i(this.u.uSize, this.w, this.h); gl.uniform1i(this.u.uHud, this.hudY | 0);
+    const z = this.zoom;
+    gl.uniform2f(this.u.uScale, 2 * z / (this.w * 1.12), 2 * z / (this.h * 1.12 * Math.max(cp, 0.9)));
+    gl.uniform2f(this.u.uPan, -this.px * (z - 1) * 1.6, this.py * (z - 1) * 1.6);
+    gl.uniform1f(this.u.uDist, this.w * 0.9);
     const n = this.w * this.h;
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);                             // top
     gl.drawArraysInstanced(gl.TRIANGLES, m[5] > 0 ? 12 : 6, 6, n);            // front or back, whichever faces the camera
@@ -874,11 +978,11 @@ void main() { o = vec4(vCol, 1.0); }`;
 function setVoxel(on, quiet) {
   if (on) {
     try { if (!VOX.gl && !VOX.init()) throw new Error('no webgl2'); }
-    catch (e) { VOX.gl = null; $('optVoxel').checked = false; if (!quiet) toast('This browser or graphics card cannot show the voxel style.'); on = false; }
+    catch (e) { VOX.gl = null; $('optVoxel').checked = false; if (!quiet) toast('This browser or graphics card cannot show the voxel view.'); on = false; }
   }
   VOX.on = !!on && S.sys === 'nes';
   $('cv3').hidden = !VOX.on; scr.classList.toggle('voxel', VOX.on); if (typeof syncToggles === 'function') syncToggles();
-  if (VOX.on && S.core && S.running) { VOX.w = 0; draw(); }
+  if (VOX.on && S.core && S.running) { VOX.w = 0; VOX.hudY = 0; VOX.hudSeen = { y: -1, n: 0 }; draw(); }
 }
 function setAspect(ar) {
   if (!(ar > 0.5 && ar < 3)) ar = 4 / 3;
@@ -977,7 +1081,7 @@ async function startGame(bytes, name, opts = {}) {
   A.setRate(core.sampleRate());
   const f = core.frame();
   setAspect(sys.aspect || (core.exports.web_aspect ? core.exports.web_aspect() : f.w / f.h));
-  S.rom = info; S.hash = opts.demo ? 'demo' : await hashBytes(bytes);
+  S.rom = info; S.romBytes = bytes; S.hash = opts.demo ? 'demo' : await hashBytes(bytes);
   S.lastSram = null; S.touch = 0;
   if (!opts.demo) {
     const saved = await DB.get('sram', S.hash);

@@ -54,17 +54,16 @@ A browser calls the page about 60 times a second. Each time:
 
 Speed is kept steady by watching that sound buffer. If it's running low the page runs an extra frame; if it's too full it waits. That keeps the game at the right speed and the sound from crackling. Fast forward simply runs 4 frames per step.
 
-## The voxel style (NES)
+## The voxel view (NES)
 
-An optional view that draws the NES picture as a grid of 3D blocks instead of flat pixels.
+An optional view that rebuilds the NES picture as solid 3D, using what the console itself knows about the scene. The idea comes from the voxel renderer in the open-source nesrecomp project (separating characters from scenery, standing them up as solid objects, keeping the status bar flat); the code here is our own.
 
+- **Reading the console's data.** Each frame the page takes a save state and pulls out three things: the sprite list (OAM, up to 64 characters/objects with position and flip flags), the sprite size/table settings, and the picture tiles (CHR). Sprite pixels are rebuilt from the tiles, producing a mask the same size as the screen: "this pixel belongs to a sprite". If a game's tiles can't be read, it falls back to treating whatever differs from the colour around each sprite as the sprite.
+- **Layers.** Scenery becomes a low stepped relief (brighter = slightly higher). Sprite pixels become tall solid blocks so characters and enemies stand out in front. Scenery just down-right of a sprite is darkened, which reads as a contact shadow.
+- **Flat status bar.** Many games park an invisible "sprite 0" under the status bar to time the screen split. When it stays put for a few frames, everything above it is drawn flat.
+- **Drawing.** The graphics chip draws one cube per pixel (about 57,000) in one instanced WebGL2 call, reading the picture and the mask as textures. Only the faces turned toward the camera are drawn.
+- **Camera.** Straight on by default with a slight lean. Moving the mouse over the screen orbits a little; the mouse wheel zooms; double-click resets.
 - The normal flat picture is still drawn behind the scenes every frame (the save-state thumbnails use it). The voxel view is a second canvas shown on top.
-- Each frame the page uploads the 256 by 240 picture to the graphics chip as a texture. The graphics chip then draws one small cube per pixel (about 61,000 of them) in a single instanced draw call using WebGL2. Each cube's colour is the pixel's colour, and its height is its brightness: bright pixels make tall blocks and dark ones make short ones.
-- The camera looks straight at the picture with a gentle perspective, so you see the tops of the blocks head-on and the sides of the blocks toward the edges. Block sides are shaded darker toward their base, which makes each pixel read as a little pillar.
-- Lighting is simple: the tops catch a light from above-left and the sides are darker.
-- Only the faces that can be seen are drawn: the top, the front or back, and the left or right side, whichever faces the camera. That roughly halves the work.
-- The mouse tilts the view a little (side to side and up and down) and it eases back to straight-on when you leave the screen. The view only redraws when the picture or the camera changes.
-- If the browser has no WebGL2, or the graphics chip resets, the option switches itself off and the flat view carries on.
 
 ## Saving
 
